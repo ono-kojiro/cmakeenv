@@ -1,0 +1,167 @@
+#!/usr/bin/env sh
+
+set -e
+top_dir="$(cd "$(dirname "$0")" > /dev/null 2>&1 && pwd)"
+script=${0##*/}
+
+version="0.0.1"
+name="cmake"
+
+if [ "x$CMAKEENV_ROOT" = "x" ]; then
+  echo "ERROR : no CMAKEENV_ROOT environment variable" 1>&2
+  exit 1
+fi
+
+xenv_root="$CMAKEENV_ROOT"
+
+do_help()
+{
+  echo "usage : $script [<options>] command"
+}
+
+do_version()
+{
+  echo "$version"
+}
+
+do_fetch()
+{
+  cwd=$(pwd)
+  if [ ! -e "$cachedir/${name}-${targetver}.tar.gz" ]; then
+    cd $cachedir
+    wget https://github.com/Kitware/CMake/releases/download/v${targetver}/${name}-${targetver}.tar.gz
+  fi
+
+  cd ${cwd}
+}
+
+do_extract()
+{
+  tar -C $xenv_root/source/ -xf $cachedir/${name}-${targetver}.tar.*
+}
+
+do_patch()
+{
+  # patch
+  cd $srcdir
+  case ${targetver} in
+    * )
+      :
+      ;;
+  esac
+}
+
+do_configure()
+{
+  # configure
+  mkdir -p $builddir
+  cd $builddir
+
+  case ${targetver} in
+    * )
+      if [ ! -e "./Makefile" ]; then
+        sh $srcdir/configure --prefix=$destdir
+      else
+        echo "INFO : skip configure" 1>&2
+      fi
+      ;;
+    * )
+      echo "ERROR : invalid version, ${targetver}" 1>&2
+      exit 1
+      ;;
+  esac
+}
+
+do_build()
+{
+  case ${targetver} in
+    * )
+      make -C $builddir
+      ;;
+  esac
+}
+
+do_install()
+{
+  case ${targetver} in
+    * )
+      make -C $builddir install
+      ;;
+  esac
+}
+
+while [ "$#" -ne 0 ]; do
+  case "$1" in
+    --help | -h )
+      do_help
+      exit 1
+      ;;
+    --version | -v )
+      do_version
+      exit 1
+      ;;
+    * )
+      break
+      ;;
+  esac
+
+  shift
+done
+
+if [ "$#" -eq 0 ]; then
+  do_help
+  exit 1
+fi
+
+cmd=$1
+shift
+
+if [ "$#" -eq 0 ]; then
+  do_help
+  exit 1
+fi
+
+targetver=$1
+shift
+
+if [ -z "$cmd" ] || [ -z "$targetver" ]; then
+  do_help
+  exit 1
+fi
+
+srcdir="$xenv_root/source/${name}-${targetver}"
+builddir="$xenv_root/build/${name}-${targetver}"
+destdir="$xenv_root/versions/${targetver}"
+
+cachedir="$xenv_root/cache"
+
+case "$cmd" in
+  help )
+    do_help
+    exit 1
+    ;;
+  fetch )
+    do_fetch
+    ;;
+  extract )
+    do_extract
+    ;;
+  patch )
+    do_patch
+    ;;
+  configure | config )
+    do_configure
+    ;;
+  build )
+    do_build
+    ;;
+  install )
+    do_install
+    ;;
+  * )
+    echo "invalid command, $cmd"
+    exit 1
+    ;;
+esac
+
+

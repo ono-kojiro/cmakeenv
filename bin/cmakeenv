@@ -1,0 +1,401 @@
+#!/usr/bin/env sh
+
+set -e
+top_dir="$(cd "$(dirname "$0")" > /dev/null 2>&1 && pwd)"
+script=${0##*/}
+
+ver="0.0.1"
+envname="$script"
+    
+name="cmake"
+xenv_root="$CMAKEENV_ROOT"
+xenv_debug="$CMAKEENV_DEBUG"
+
+ENVNAME="$(echo $envname | tr '[a-z]' '[A-Z]')"
+
+if [ "x$xenv_root" = "x" ]; then
+  echo "ERROR : no ${ENVNAME}_ROOT environment variable" 1>&2
+  exit 1
+fi
+
+do_help()
+{
+  if [ "x$xenv_debug" = "x1" ]; then
+    echo "DEBUG : do_help()" 1>&2
+  fi
+
+  echo "$script $ver"
+  echo "usage : $script <command> [<args>]"
+  cat - << 'EOS'
+
+   help         show this message
+   init          configure environment
+   exec          execute with selected version
+   global        change user-global version
+   local         change directory-specific version
+   install       build and install specific version
+   versions      show installed version list
+   version_file  show location of version file
+   version       show current version in version file
+EOS
+
+}
+
+do_init()
+{
+  if [ "x$xenv_debug" = "x1" ]; then
+    echo "DEBUG : do_init()" 1>&2
+  fi
+
+  opt=$1
+  shift
+
+  case $opt in
+    --path )
+      cat - << EOS
+export PATH="$xenv_root/shims:\${PATH}"
+EOS
+      ;;
+    - )
+      echo "$envname() {"
+      cat - << 'EOS'
+  local cmd
+  cmd=$1
+  if [ "$#" -gt 0 ]; then
+    shift
+  fi
+EOS
+      echo "  command $envname \"\$cmd\" \"\$@\""
+      echo "}"
+      ;;
+    * )
+      echo "ERROR : invalid init option, $opt" 1>&2
+      ;;
+  esac
+}
+
+do_install()
+{
+  mkdir -p $xenv_root/source/
+  cwd=$(pwd)
+
+  build_script="$xenv_root/plugins/${name}-build/bin/${name}-build"
+  if [ ! -e "$build_script" ]; then
+    echo "ERROR : no build script, $build_script" 1>&2
+    exit 1
+  fi
+  $build_script fetch   $targetver
+  $build_script extract $targetver
+  $build_script config  $targetver
+  $build_script build   $targetver
+  $build_script install $targetver
+}
+
+do_uninstall()
+{
+  if [ "x$xenv_debug" = "x1" ]; then
+    echo "DEBUG : do_uninstall()" 1>&2
+  fi
+
+  destdir="$xenv_root/versions/${targetver}"
+  if [ -d "$destdir" ]; then
+    rm -rf "$xenv_root/versions/${targetver}"
+  else
+    echo "ERROR : no such directory, $destdir"
+  fi
+}
+
+do_update()
+{
+  targetver="$(${envname} version)"
+  destdir="$xenv_root/versions/${targetver}"
+  
+  if [ "x$xenv_debug" = "x1" ]; then
+    echo "DEBUG : do_update()" 1>&2
+    echo "DEBUG : destdir is $destdir" 1>&2
+  fi
+  
+ 
+  # remove all shims
+  if [ "x$xenv_debug" = "x1" ]; then
+    echo "DEBUG : remove $xenv_root/shims/*" 1>&2
+  fi
+    
+  rm -f $xenv_root/shims/*
+
+  if [ "$targetver" = "system" ]; then
+    if [ "x$xenv_debug" = "x1" ]; then
+      echo "DEBUG : no need to update shims for system" 1>&2
+    fi
+    return
+  fi
+
+  if [ ! -d "$destdir/bin" ]; then
+    return
+  fi
+
+  items=$(ls -m $destdir/bin/ | sed 's/,/ /g')
+
+  for item in $items; do
+    mkdir -p "$xenv_root/shims"
+    prog=$xenv_root/shims/$item
+  
+    if [ "x$xenv_debug" = "x1" ]; then
+      echo "DEBUG : create $prog" 1>&2
+    fi
+
+    cat - << 'EOS' > $prog
+#!/usr/bin/env sh
+set -e
+program="${0##*/}"
+EOS
+
+    echo "exec \"\$${ENVNAME}_ROOT/bin/${envname}\" exec \"\$program\" \"\$@\"" >> $prog
+    chmod 755 $prog
+  done
+}
+
+do_versions()
+{
+  if [ "x$xenv_debug" = "x1" ]; then
+    echo "DEBUG : do_version()" 1>&2
+  fi
+  target_ver="$(${envname} version)"
+ 
+  if [ "$target_ver" = "system" ]; then
+    echo "* system"
+  else
+    echo "  system"
+  fi
+
+  if [ -d "$xenv_root/versions" ]; then
+    vers=$(ls -m $xenv_root/versions/ | sed 's/,/ /g')
+    for ver in $vers; do
+      num=`echo ":$ver:" | grep ":$target_ver:" | wc -l`
+      if [ "$num" -eq 1 ]; then
+        echo "* $ver"  
+      else
+        echo "  $ver"
+      fi
+    done
+  fi
+}
+
+do_version_file()
+{
+  if [ "x$xenv_debug" = "x1" ]; then
+    echo "DEBUG : do_version_file()" 1>&2
+  fi
+  target_dir="$(cd . > /dev/null 2>&1 && pwd)"
+ 
+  # search version file
+  version_file=""
+  while [ true ]; do
+    num=`echo $target_dir | grep -E '^/[^/]*$' | wc -l`
+    if [ $num -eq 1 ]; then
+      break
+    fi
+
+    if [ -f "${target_dir}/.${name}-version" ]; then
+        version_file="${target_dir}/.${name}-version"
+        break
+    fi
+
+    # change to ..
+    target_dir="${target_dir%/*}"
+  done
+
+  if [ -z "$version_file" ]; then
+    version_file="$xenv_root/version"
+  fi
+
+  echo $version_file
+}
+
+
+do_version()
+{
+  if [ "x$xenv_debug" = "x1" ]; then
+    echo "DEBUG : do_version()" 1>&2
+  fi
+  version_file=$(${envname} version_file)
+
+  if [ ! -e "$version_file" ]; then
+    echo "system" > $version_file
+  fi
+
+  cat $version_file
+}
+
+do_global()
+{
+  if [ "x$xenv_debug" = "x1" ]; then
+    echo "DEBUG : do_global()" 1>&2
+  fi
+  version_file="$xenv_root/version"
+  echo ${targetver} > $version_file
+  
+  if [ "x$xenv_debug" = "x1" ]; then
+    echo "DEBUG : switch to" `cat $version_file` 1>&2
+  fi
+
+  do_update
+
+  # clear bash's cache of path
+  hash -r
+}
+
+do_local()
+{
+  if [ "x$xenv_debug" = "x1" ]; then
+    echo "DEBUG : do_local()" 1>&2
+  fi
+  echo ${targetver} > .${name}-version
+  
+  do_update
+
+  # clear bash's cache of path
+  hash -r
+}
+
+do_exec()
+{
+  if [ "x$xenv_debug" = "x1" ]; then
+    echo "DEBUG : do_exec()" 1>&2
+  fi
+
+  target_ver="$(${envname} version)"
+  if [ "x$xenv_debug" = "x1" ]; then
+    echo "DEBUG : target_ver is $target_ver" 1>&2
+  fi
+
+  if [ "$target_ver" = "system" ]; then
+    XENV_BIN_PATH="/usr/bin"
+  else
+    XENV_BIN_PATH="$xenv_root/versions/$target_ver/bin"
+  fi
+
+  # for shared object
+  XENV_LIB_PATH="$xenv_root/versions/$target_ver/lib"
+
+  if [ "x$xenv_debug" = "x1" ]; then
+    echo "DEBUG : XENV_BIN_PATH is $XENV_BIN_PATH" 1>&2
+    echo "DEBUG : \$@ is '"$@"'" 1>&2
+  fi
+
+  PATH="$XENV_BIN_PATH:$PATH" \
+    LD_LIBRARY_PATH="$XENV_LIB_PATH:$LD_LIBRARY_PATH" \
+    "$@"
+}
+
+while [ "$#" -ne 0 ]; do
+  case "$1" in
+    --help | -h )
+      do_help
+      exit 1
+      ;;
+    --version | -v )
+      echo "$version"
+      exit 1
+      ;;
+    --debug | -d )
+      xenv_debug=1
+      echo "DEBUG : enable debug" 1>&2
+      ;;
+    * )
+      break
+      ;;
+  esac
+
+  shift
+done
+
+if [ "$#" -eq 0 ]; then
+  do_help
+  exit 1
+fi
+
+cmd=$1
+shift
+
+if [ -z "$cmd" ]; then
+  do_help
+  exit 1
+fi
+
+case "$cmd" in
+  help )
+    help
+    exit 1
+    ;;
+  init )
+    do_init "$@"
+    ;;
+  install )
+    if [ "$#" -ne 0 ]; then
+      targetver=$1
+      shift
+    else
+      echo "no version number for install command"
+      exit 1
+    fi
+
+    do_install
+    ;;
+  uninstall )
+    if [ "$#" -ne 0 ]; then
+      targetver=$1
+      shift
+    else
+      echo "no version number for uninstall command"
+      exit 1
+    fi
+    do_uninstall
+    ;;
+  version_file )
+    do_version_file
+    ;;
+  version )
+    do_version
+    ;;
+  versions )
+    do_versions
+    ;;
+  global )
+    if [ "$#" -ne 0 ]; then
+      targetver=$1
+      shift
+    else
+      echo "no version number for global command"
+      exit 1
+    fi
+
+    do_global
+    ;;
+  local )
+    if [ "$#" -ne 0 ]; then
+      targetver=$1
+      shift
+    else
+      echo "no version number for local command"
+      exit 1
+    fi
+
+    do_local
+    ;;
+  update )
+    do_update
+    ;;
+  exec )
+    if [ "x$xenv_debug" = "x1" ]; then
+      echo "DEBUG : run exec command with option, $@" 1>&2
+    fi
+    do_exec "$@"
+    ;;
+  * )
+    echo "invalid command, $cmd"
+    exit 1
+    ;;
+esac
+
+
