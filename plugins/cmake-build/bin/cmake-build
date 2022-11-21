@@ -4,7 +4,7 @@ set -e
 top_dir="$(cd "$(dirname "$0")" > /dev/null 2>&1 && pwd)"
 script=${0##*/}
 
-version="0.0.1"
+version="0.0.2"
 name="cmake"
 
 if [ "x$CMAKEENV_ROOT" = "x" ]; then
@@ -27,6 +27,7 @@ do_version()
 do_fetch()
 {
   cwd=$(pwd)
+  mkdir -p "$cachedir"
   if [ ! -e "$cachedir/${name}-${targetver}.tar.gz" ]; then
     cd $cachedir
     wget https://github.com/Kitware/CMake/releases/download/v${targetver}/${name}-${targetver}.tar.gz
