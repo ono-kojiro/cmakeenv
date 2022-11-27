@@ -4,7 +4,7 @@ set -e
 top_dir="$(cd "$(dirname "$0")" > /dev/null 2>&1 && pwd)"
 script=${0##*/}
 
-ver="0.0.1"
+ver="0.0.2"
 envname="$script"
     
 name="cmake"
@@ -325,7 +325,7 @@ fi
 
 case "$cmd" in
   help )
-    help
+    do_help
     exit 1
     ;;
   init )
