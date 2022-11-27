@@ -1,0 +1,134 @@
+\newcommand{\mytitle}{%
+  \begin{center}
+    % \@titleなどの変数はスタイルファイルの中でしか
+    % 参照できない。
+    % そのため、\mytitleというコマンドを新たに作る。
+    \huge \@title
+    \vspace{15mm}
+
+    \Large \@author
+    \vspace{15mm}
+
+    \Large \@date
+  \end{center}
+}
+
+\usepackage{titlesec}
+\usepackage{lastpage}
+\usepackage{pdfpages}
+
+\renewcommand{\prechaptername}{}  % "第" を削除
+\renewcommand{\postchaptername}{} % "章" を削除
+%\renewcommand{\thechapter}{\arabic{chapter}}
+
+% PDFのしおりに章節番号を含める
+\usepackage{hyperref}
+\usepackage{pxjahyper}
+\hypersetup{bookmarksnumbered}
+
+
+% オリジナルのsphinxmaketitleのコピーを保存
+\let\origsphinxmaketitle\sphinxmaketitle
+
+\renewcommand{\sphinxmaketitle}{%
+  \pagenumbering{arabic}
+  \thispagestyle{normal}
+
+  % sphinxオリジナルのタイトルを出力する場合
+  %\origsphinxmaketitle
+
+  % 通常のタイトルを出力する場合
+  %\maketitle
+
+  \mytitle
+}
+
+% 通常の目次を出力
+\let\origsphinxtableofcontents\sphinxtableofcontents
+\renewcommand{\sphinxtableofcontents}{%
+  \tableofcontents
+  \clearpage
+}
+
+% chapterページのスタイルを通常に変更
+\renewcommand{\plainifnotempty}{%
+  \thispagestyle{normal}
+}
+
+\fancypagestyle{normal}{
+  \fancyhf{} % 設定をクリア
+
+  \fancyhead[L]{}
+  \fancyhead[R]{}
+  \fancyhead[C]{}
+
+  \fancyfoot[L]{}
+  \fancyfoot[R]{}
+  \fancyfoot[C]{\thepage / \pageref{LastPage}}
+
+  \renewcommand{\headrulewidth}{0.4pt}
+  \renewcommand{\footrulewidth}{0.4pt}
+}
+
+\fancypagestyle{plain}{
+  \fancyhf{} % 設定をクリア
+
+  \fancyhead[L]{}
+  \fancyhead[R]{}
+  \fancyhead[C]{}
+
+  \fancyfoot[L]{}
+  \fancyfoot[R]{}
+  \fancyfoot[C]{\thepage / \pageref{LastPage}}
+
+  \renewcommand{\headrulewidth}{0.4pt}
+  \renewcommand{\footrulewidth}{0.4pt}
+}
+
+\DeclareFontShape{JY2}{gt}{bx}{it}{<->ssub*gt/m/n}{}
+\DeclareFontShape{JT2}{gt}{bx}{it}{<->ssub*gt/m/n}{}
+\DeclareFontShape{JY2}{gt}{m}{it}{<->ssub*gt/m/n}{}
+\DeclareFontShape{JT2}{gt}{m}{it}{<->ssub*gt/m/n}{}
+\DeclareFontShape{JY2}{mc}{bx}{it}{<->ssub*mc/m/n}{}
+\DeclareFontShape{JT2}{mc}{bx}{it}{<->ssub*mc/m/n}{}
+\DeclareFontShape{JY2}{mc}{m}{it}{<->ssub*mc/m/n}{}
+\DeclareFontShape{JT2}{mc}{m}{it}{<->ssub*mc/m/n}{}
+
+\DeclareFontShape{JT2}{mc}{b}{n}{<->ssub*mc/m/n}{}
+\DeclareFontShape{JY2}{mc}{b}{n}{<->ssub*mc/m/n}{}
+
+\DeclareFontShape{JT2}{gt}{b}{n}{<->ssub*mc/m/n}{}
+\DeclareFontShape{JY2}{gt}{b}{n}{<->ssub*mc/m/n}{}
+\DeclareFontShape{JT2}{gt}{b}{it}{<->ssub*mc/m/n}{}
+\DeclareFontShape{JY2}{gt}{b}{it}{<->ssub*mc/m/n}{}
+
+\pagenumbering{arabic}
+
+% chapter
+
+% change 'CONTENTS' to '目次'
+\renewcommand{\contentsname}{目次}
+
+%\startcontents[chapters]
+
+%\titleformat{\chapter} % command
+%  [hang]               % shape
+%  {\Large\bfseries}    % format
+%  {}                   % label
+%  {0pt}                % spacing between label and title
+%  {\fontsize{20pt}{20pt}\bfseries\thechapter} % before code
+%  []                                           % after code
+
+\titleformat{\chapter} % command
+  [hang]               % shape
+  {\Large\bfseries}    % format
+  {}                   % label
+  {0pt}                % spacing between label and title
+  {%
+    \ifnum \thechapter > 0 % 目次以外のとき
+      %\fontsize{20pt}{20pt}\bfseries\thechapter
+      %\normalfont\LARGE\headfont\thechapter
+      \LARGE\headfont\thechapter
+    \fi
+  } % before code
+  []                                           % after code
