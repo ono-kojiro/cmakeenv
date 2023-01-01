@@ -60,7 +60,9 @@ do_configure()
 
   case ${targetver} in
     * )
-      if [ ! -e "./Makefile" ]; then
+      if [ -e "$srcdir/CMakeLists.txt" ]; then
+        cmake -G "Ninja" ${srcdir}
+      elif [ ! -e "./Makefile" ]; then
         sh $srcdir/configure --prefix=$destdir
       else
         echo "INFO : skip configure" 1>&2
@@ -71,24 +73,44 @@ do_configure()
       exit 1
       ;;
   esac
+
+  cd ${top_dir}
 }
 
 do_build()
 {
+  cd ${builddir}
   case ${targetver} in
     * )
-      make -C $builddir
+      if [ -e "build.ninja" ]; then
+        ninja
+      elif [ -e "Makefile" ]; then
+        make -C $builddir -j `nproc`
+      else
+        echo "no files for build"
+        exit 1
+      fi
       ;;
   esac
+  cd ${top_dir}
 }
 
 do_install()
 {
+  cd ${builddir}
   case ${targetver} in
     * )
-      make -C $builddir install
+      if [ -e "build.ninja" ]; then
+        cmake --install . --prefix=${destdir}
+      elif [ -e "Makefile" ]; then
+        make -C $builddir install
+      else
+        echo "no files for build"
+        exit 1
+      fi
       ;;
   esac
+  cd ${top_dir}
 }
 
 while [ "$#" -ne 0 ]; do
