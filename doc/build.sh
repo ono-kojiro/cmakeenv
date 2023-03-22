@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-set -e
+#set -e
 top_dir="$(cd "$(dirname "$0")" > /dev/null 2>&1 && pwd)"
 cd $top_dir
 
@@ -63,6 +63,25 @@ EOS
   sed -i -e "s/:maxdepth: 2/:maxdepth: 6/" $output_dir/index.rst
 
   rm -f tmp.txt
+}
+
+add_extensions()
+{
+  echo "add docxsphinx plugin"
+  conf_py="$output_dir/conf.py"
+  sed -i -e "s/extensions = \[\]/extensions = ['docxsphinx']/" $conf_py
+
+  mkdir -p ${output_dir}/source/ 
+  cp -f template.docx ${output_dir}/source/
+
+  echo "apply template.docx"
+  cat - << 'EOS' > tmp.py
+docx_template = 'template.docx'
+EOS
+
+  # ファイルの末尾に tmp.py を追加
+  sed -i -e '$r tmp.py' $conf_py
+  rm -f tmp.py
 }
 
 change_theme()
@@ -161,6 +180,14 @@ pdf()
   cp -f ${output_dir}/_build/latex/${filename}.pdf .
 }
 
+docx()
+{
+  cd $output_dir
+  make docx
+  cd ${top_dir}
+  cp -f ${output_dir}/_build/docx/cmakeenv-0.1.docx .
+}
+
 pdf2()
 {
   dvipdfmx -S -P 0x0000 -o ${filename}-enc.pdf \
@@ -183,6 +210,7 @@ all()
 {
   mclean
   init
+  add_extensions
   change_theme
   change_docclass
   add_number
